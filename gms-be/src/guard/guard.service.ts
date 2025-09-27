@@ -470,55 +470,71 @@ export class GuardService {
 
 
   async getAssignedGuardByGuardId(guardId: string, organizationId: string ) {
-      try {
-          const assignedGuard = await this.prisma.assignedGuard.findFirst({
-            where: { 
-              guardId: guardId,
-              location : {
-                organizationId : organizationId
-              } 
-            },
+    try {
+      if (!organizationId) {
+        console.error('[getAssignedGuardByGuardId] Missing organizationId');
+        throw new ForbiddenException('Organization ID is required');
+      }
+      if (!guardId) {
+        console.error('[getAssignedGuardByGuardId] Missing guardId');
+        throw new ForbiddenException('Guard ID is required');
+      }
+      const assignedGuard = await this.prisma.assignedGuard.findFirst({
+        where: {
+          guardId: guardId,
+          location: {
+            organizationId: organizationId,
+          },
+        },
+        include: {
+          location: {
             include: {
-              location: {
-                include : {
-                  client : {
-                    select : {
-                      id : true,
-                      companyName : true,
-                      contractNumber : true,
-                    }
-                  }
-                }
+              client: {
+                select: {
+                  id: true,
+                  companyName: true,
+                  contractNumber: true,
+                },
               },
-              
             },
-          });
+          },
+        },
+      });
 
-          if (!assignedGuard) return null;
+      if (!assignedGuard) {
+        throw new NotFoundException('Assigned guard not found for this organization and guard ID');
+      }
 
-          if (assignedGuard.deploymentDate) {
-            const deploymentDate = new Date(assignedGuard.deploymentDate);
-            const deploymentTill = assignedGuard.deploymentTill
-              ? new Date(assignedGuard.deploymentTill)
-              : new Date();
+      let totalWorkingDays: number | null = null;
+      if (assignedGuard.deploymentDate) {
+        const deploymentDate = new Date(assignedGuard.deploymentDate);
+        const deploymentTill = assignedGuard.deploymentTill
+          ? new Date(assignedGuard.deploymentTill)
+          : new Date();
+        const timeDiff = deploymentTill.getTime() - deploymentDate.getTime();
+        totalWorkingDays = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
+      }
 
-            const timeDiff = deploymentTill.getTime() - deploymentDate.getTime();
-            const daysWorked = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
-
-            return {
-              ...assignedGuard,
-              totalWorkingDays: daysWorked,
-            };
-          }
-
-          return {
-            ...assignedGuard,
-            totalWorkingDays: null,
-          };
-        } catch (error) {
-          handlePrismaError(error);
-        }
+      // Flatten and return relevant info for frontend best practice
+      return {
+        id: assignedGuard.id,
+        guardId: assignedGuard.guardId,
+        locationId: assignedGuard.locationId,
+        requestedGuardId: assignedGuard.requestedGuardId,
+        deploymentDate: assignedGuard.deploymentDate,
+        deploymentTill: assignedGuard.deploymentTill,
+        guardCategoryId: assignedGuard.guardCategoryId,
+        totalWorkingDays,
+        clientName: assignedGuard.location?.client?.companyName || null,
+        clientContractNumber: assignedGuard.location?.client?.contractNumber || null,
+        locationName: assignedGuard.location?.locationName || null,
+      };
+    } catch (error) {
+      handlePrismaError(error);
+      // Defensive: If handlePrismaError does not throw, throw generic error
+      throw new ForbiddenException('Failed to fetch assigned guard');
     }
+  }
   //#endregion 
 
     /**

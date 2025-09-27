@@ -38,7 +38,7 @@ const AssignGuardsForm = () => {
     const [selectedLocationId, setSelectedLocationId] = useState(null);
     const [requestedGuards, setRequestedGuards] = useState([]);
     const [selectedRequestedGuard, setSelectedRequestedGuard] = useState(null);
-    const [assignedGuardForLocation, setAssignedGuardForLocation] = useState([]);
+    const [assignedGuardForLocation, setAssignedGuardForLocation] = useState(null);
 
 
     // Fetch guards data on component mount
@@ -106,17 +106,17 @@ const AssignGuardsForm = () => {
     // Fetch assigned guard data when selectedGuardId changes
     useEffect(() => {
         const getAssignedGuardForLocation = async () => {
-            if (!selectedGuardId) return;
-            
+            if (!selectedGuardId) {
+                setAssignedGuardForLocation(null);
+                return;
+            }
             try {
                 const res = await userRequest.get(`/guards/assigned-guard/${selectedGuardId}`);
                 setAssignedGuardForLocation(res.data.data);
             } catch (error) {
-                console.error("Error fetching assigned guard:", error);
-                toast.error("Failed to fetch assigned guard data");
+                setAssignedGuardForLocation(null);
             }
         };
-        
         getAssignedGuardForLocation();
     }, [selectedGuardId]);
 
@@ -192,6 +192,56 @@ const AssignGuardsForm = () => {
         setRequestedGuards([]);
 
     }
+
+
+    // Render assignment info for selected guard
+    const renderAssignmentInfo = () => {
+        if (!assignedGuardForLocation) return null;
+        const assignment = assignedGuardForLocation;
+        // Find client and location names from IDs
+        let clientName = 'N/A';
+        let locationName = 'N/A';
+        if (assignment.clientId && Array.isArray(clients)) {
+            const clientObj = clients.find(c => c.id === assignment.clientId);
+            clientName = clientObj?.companyName || clientObj?.contractNumber || assignment.clientId || 'N/A';
+        }
+        if (assignment.locationId && selectedClient && Array.isArray(selectedClient.locations)) {
+            const locationObj = selectedClient.locations.find(l => l.id === assignment.locationId);
+            locationName = locationObj?.locationName || assignment.locationId || 'N/A';
+        }
+        const deploymentDate = assignment.deploymentDate ? new Date(assignment.deploymentDate) : null;
+        const deploymentTill = assignment.deploymentTill ? new Date(assignment.deploymentTill) : null;
+        let totalWorkingDays = '';
+        if (deploymentDate) {
+            const endDate = deploymentTill || new Date();
+            const diffTime = Math.abs(endDate - deploymentDate);
+            totalWorkingDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        }
+        return (
+            <div className="my-6">
+                <table className="w-full border-collapse bg-gray-50 rounded-xl overflow-hidden">
+                    <thead className="bg-blue-50">
+                        <tr>
+                            <th className="py-2 px-4">Client</th>
+                            <th className="py-2 px-4">Location Name</th>
+                            <th className="py-2 px-4">Deployment Date</th>
+                            <th className="py-2 px-4">Deployed Till</th>
+                            <th className="py-2 px-4">Total Working Days</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr className="bg-white">
+                            <td className="py-2 px-4 text-center">{clientName}</td>
+                            <td className="py-2 px-4 text-center">{locationName}</td>
+                            <td className="py-2 px-4 text-center">{deploymentDate ? deploymentDate.toLocaleDateString() : 'N/A'}</td>
+                            <td className="py-2 px-4 text-center">{deploymentTill ? deploymentTill.toLocaleDateString() : 'Till Date'}</td>
+                            <td className="py-2 px-4 text-center">{totalWorkingDays}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        );
+    };
 
     return (
         <div className="min-h-screen bg-formBGBlue flex flex-col w-full px-4 pt-4">
@@ -315,6 +365,8 @@ const AssignGuardsForm = () => {
                                         </div>
                                     </div>
                                 </div>
+                                {/* Assignment Info Table */}
+                                {renderAssignmentInfo()}
 
                                 {/* Bottom Form Section */}
                                 <div className="grid grid-cols-3 gap-6">
