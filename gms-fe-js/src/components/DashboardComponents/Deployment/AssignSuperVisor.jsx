@@ -12,14 +12,14 @@ import { useCurrentUser } from '@/lib/hooks';
 const AssignSuperVisor = () => {
     const { user } = useCurrentUser();
 
-    const [allSupervisors, setAllSupervisors] = useState([]);
+    const [allAssignedGuards, setAllAssignedGuards] = useState([]);
     const [selectedSupervisorId, setSelectedSupervisorId] = useState('');
     const [clients, setClients] = useState([]);
     const [selectedClient, setSelectedClient] = useState(null);
     const [assignedSupervisor, setAssignedSupervisor] = useState(null);
 
     const validationSchema = Yup.object({
-        employeeId: Yup.string().required('Service No. is required'),
+        guardId: Yup.string().required('Service No. is required'),
         clientId: Yup.string().required('Client ID is required'),
         locationId: Yup.string().required('Location ID is required'),
 
@@ -27,9 +27,9 @@ const AssignSuperVisor = () => {
 
     const initialValues = {
 
-        clientId: '',
-        locationId: '',
-        employeeId: '',
+    clientId: '',
+    locationId: '',
+    guardId: '',
 
     };
 
@@ -54,11 +54,12 @@ const AssignSuperVisor = () => {
 
     useEffect(() => {
 
-        //getting all supervisors
-        const getSupervisor = async () => {
+
+        // Fetch all assigned guards for service number select box
+        const getAssignedGuards = async () => {
             try {
-                const res = await userRequest.get("/employee/get/supervisors");
-                setAllSupervisors(res.data.data);
+                const res = await userRequest.get("/guards/by-organization");
+                setAllAssignedGuards(res.data.data);
             } catch (error) {
                 console.log(error);
             }
@@ -81,15 +82,15 @@ const AssignSuperVisor = () => {
             setAssignedSupervisor(res.data.data);
         }
 
-        getSupervisor();
+    getAssignedGuards();
         getClients();
         selectedSupervisorId && getAssignedSupervisor();
 
     }, [selectedSupervisorId])
 
     const getSelectedSupervisorName = () => {
-        const supervisor = allSupervisors.find(supervisor => supervisor.id === selectedSupervisorId);
-        return supervisor?.fullName || "Select Service No.";
+        const guard = allAssignedGuards.find(guard => guard.id === selectedSupervisorId);
+        return guard?.fullName || "Select Service No.";
     }
 
     const handleClientChange = (e) => {
@@ -102,12 +103,14 @@ const AssignSuperVisor = () => {
 
     const handleSubmit = async (values, { setSubmitting, resetForm }) => {
         // Handle form submission
-        console.log('Form submitted:', values);
-
+        // Prepare payload for guard supervisor assignment
+        const payload = {
+            guardId: values.guardId,
+            clientId: values.clientId,
+            locationId: values.locationId
+        };
         try {
-            const res = await userRequest.post("/employee/assign-supervisor", values);
-
-
+            const res = await userRequest.post(`/guards/promote-to-supervisor/${values.guardId}`, payload);
             console.log('Successfully assigned supervisor', res.data);
             toast.success('Successfully assigned supervisor');
         } catch (error) {
@@ -115,8 +118,6 @@ const AssignSuperVisor = () => {
             console.log(errMessage);
             toast.error(errMessage);
         }
-
-        // Reset the local state as well
         setSelectedSupervisorId('');
         setSubmitting(false);
         resetForm();
@@ -215,30 +216,26 @@ const AssignSuperVisor = () => {
                                         <div className="relative">
                                             <Field
                                                 as="select"
-                                                name="employeeId"
+                                                name="guardId"
                                                 onChange={(e) => {
                                                     const selectedId = e.target.value;
                                                     setSelectedSupervisorId(selectedId);
-
-                                                    setFieldValue('employeeId', selectedId);
-
-
-
+                                                    setFieldValue('guardId', selectedId);
                                                 }}
-                                                className={`w-full px-4 py-3 bg-formBgLightBlue border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none ${errors.employeeId && touched.employeeId
+                                                className={`w-full px-4 py-3 bg-formBgLightBlue border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none ${errors.guardId && touched.guardId
                                                     ? 'border-red-500'
                                                     : 'border-gray-200'
                                                     }`}
                                             >
                                                 <option value="">Select</option>
-                                                {/* showing employee service number but sending supervisor employee id     */}
-                                                {allSupervisors?.map((supervisor) => (
-                                                    <option key={supervisor.id} value={supervisor.id}>{supervisor.serviceNumber}</option>
+                                                {/* showing assigned guard service number but sending guard id     */}
+                                                {allAssignedGuards?.map((guard) => (
+                                                    <option key={guard.id} value={guard.id}>{guard.serviceNumber}</option>
                                                 ))}
                                             </Field>
                                             <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
                                         </div>
-                                        <ErrorMessage name="employeeId" component="div" className="text-red-500 text-sm mt-1" />
+                                        <ErrorMessage name="guardId" component="div" className="text-red-500 text-sm mt-1" />
                                     </div>
 
                                     <div>
