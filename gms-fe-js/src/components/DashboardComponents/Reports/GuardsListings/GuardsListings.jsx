@@ -1,8 +1,9 @@
 'use client'
 import { userRequest } from '@/lib/RequestMethods'
 import { downloadBulkCSVTemplate, handleFileBulkUpload, handleSubmitBulkUpload, validateBulkUploadFile } from '@/services/GuardServices/GuardBulkUpload'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import toast from 'react-hot-toast'
+import Papa from 'papaparse';
 
 const GuardsListings = () => {
 
@@ -16,6 +17,18 @@ const GuardsListings = () => {
         locationId: ''
     });
     const [guardBulkUploadFile, setGuardBulkUploadFile] = useState(null)
+
+    // CSV Modal State (Wizard)
+    const [csvModalOpen, setCsvModalOpen] = useState(false);
+    const [csvWizardStep, setCsvWizardStep] = useState(1); // 1 = preview, 2 = office select
+    const [csvData, setCsvData] = useState([]);
+    const [csvHeaders, setCsvHeaders] = useState([]);
+    const [csvEditData, setCsvEditData] = useState([]);
+    const [csvError, setCsvError] = useState('');
+    const fileInputRef = useRef(null);
+    // Office selection state
+    const [offices, setOffices] = useState([]);
+    const [selectedOfficeId, setSelectedOfficeId] = useState("");
 
     useEffect(() => {
 
@@ -77,13 +90,98 @@ const GuardsListings = () => {
 
     // Handle file upload using the service
     const handleFileUpload = (e) => {
-        try {
-            handleFileBulkUpload(e, setGuardBulkUploadFile);
-        } catch (error) {
-            toast.error(error.message);
+        setCsvModalOpen(true);
+        setCsvWizardStep(1);
+        setCsvData([]);
+        setCsvHeaders([]);
+        setCsvEditData([]);
+        setCsvError('');
+        setGuardBulkUploadFile(null);
+        setSelectedOfficeId("");
+        if (e && e.target && e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            Papa.parse(file, {
+                header: true,
+                skipEmptyLines: true,
+                complete: (results) => {
+                    if (results.errors && results.errors.length > 0) {
+                        setCsvError('CSV parsing error: ' + results.errors[0].message);
+                        setCsvData([]);
+                        setCsvHeaders([]);
+                        setCsvEditData([]);
+                        return;
+                    }
+                    setCsvData(results.data);
+                    setCsvHeaders(results.meta.fields || []);
+                    setCsvEditData(results.data.map(row => ({ ...row })));
+                    setCsvError('');
+                },
+                error: (err) => {
+                    setCsvError('CSV parsing error: ' + err.message);
+                    setCsvData([]);
+                    setCsvHeaders([]);
+                    setCsvEditData([]);
+                }
+            });
         }
     }
 
+    const closeCsvModal = () => {
+        setCsvModalOpen(false);
+        setCsvWizardStep(1);
+        setCsvData([]);
+        setCsvHeaders([]);
+        setCsvEditData([]);
+        setCsvError('');
+        setSelectedOfficeId("");
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+
+    const handleCsvCellEdit = (rowIdx, field, value) => {
+        setCsvEditData(prev => {
+            const updated = [...prev];
+            updated[rowIdx] = { ...updated[rowIdx], [field]: value };
+            return updated;
+        });
+    };
+
+    // Fetch offices for office selection step (only when needed)
+    useEffect(() => {
+        if (csvModalOpen && csvWizardStep === 2 && offices.length === 0) {
+            const fetchOffices = async () => {
+                try {
+                    const res = await userRequest.get("/organizations/get-offices");
+                    setOffices(res.data.data || []);
+                } catch (error) {
+                    toast.error("Failed to fetch offices");
+                    setOffices([]);
+                }
+            };
+            fetchOffices();
+        }
+    }, [csvModalOpen, csvWizardStep, offices.length]);
+
+    // Wizard: Step 2 submit
+    const handleCsvOfficeSubmit = async () => {
+        if (!csvEditData.length) return;
+        if (!selectedOfficeId) {
+            setCsvError('Please select an office.');
+            return;
+        }
+        try {
+            setIsLoading(true);
+            await handleSubmitBulkUpload(csvEditData, setGuardBulkUploadFile, selectedOfficeId);
+            setIsLoading(false);
+            closeCsvModal();
+            // Refresh the guards list after successful upload
+            const res = await userRequest.get("/guards/by-organization");
+            setGuardsByLocation(res.data.data);
+            toast.success('Guards uploaded successfully');
+        } catch (err) {
+            setIsLoading(false);
+            setCsvError(err?.response?.data?.message || err.message || 'Failed to upload CSV data.');
+        }
+    };
     // Handle bulk upload submission using the service
     const handleBulkUploadSubmit = async () => {
         try {
@@ -108,6 +206,118 @@ const GuardsListings = () => {
 
     return (
         <div className="w-full bg-white rounded-xl shadow-md mt-8 p-4">
+
+            {/* CSV Upload Modal (Wizard) */}
+            {csvModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+                    <div className="bg-white rounded-lg shadow-lg w-full max-w-4xl p-6 relative">
+                        <button onClick={closeCsvModal} className="absolute top-2 right-2 text-gray-500 hover:text-black text-2xl">&times;</button>
+                        <h2 className="text-lg font-semibold mb-4">Bulk Guard Upload</h2>
+                        {/* Stepper */}
+                        <div className="flex items-center mb-6">
+                            <div className={`flex-1 h-1 rounded ${csvWizardStep === 1 ? 'bg-green-700' : 'bg-green-400'}`}></div>
+                            <div className="w-8 h-8 flex items-center justify-center rounded-full bg-green-700 text-white font-bold ml-2 mr-2">1</div>
+                            <span className="mr-4">Preview & Edit</span>
+                            <div className={`flex-1 h-1 rounded ${csvWizardStep === 2 ? 'bg-green-700' : 'bg-gray-300'}`}></div>
+                            <div className={`w-8 h-8 flex items-center justify-center rounded-full ${csvWizardStep === 2 ? 'bg-green-700 text-white' : 'bg-gray-300 text-gray-700'} font-bold ml-2 mr-2`}>2</div>
+                            <span>Select Office</span>
+                        </div>
+                        {csvWizardStep === 1 && (
+                            <>
+                                <input
+                                    type="file"
+                                    accept=".csv"
+                                    ref={fileInputRef}
+                                    onChange={handleFileUpload}
+                                    className="mb-4"
+                                />
+                                {csvError && <div className="text-red-500 mb-2">{csvError}</div>}
+                                {csvHeaders.length > 0 && (
+                                    <div className="overflow-x-auto max-h-96 mb-4">
+                                        <table className="min-w-full divide-y divide-gray-800 ">
+                                            <thead className="bg-gray-50">
+                                                <tr>
+                                                    {csvHeaders.map((header) => (
+                                                        <th key={header} className="px-4 py-2 text-xs font-medium uppercase tracking-wider border-b">{header}</th>
+                                                    ))}
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {csvEditData.map((row, rowIdx) => (
+                                                    <tr key={rowIdx}>
+                                                        {csvHeaders.map((field) => (
+                                                            <td key={field} className="border px-2 py-1">
+                                                                <input
+                                                                    type="text"
+                                                                    value={row[field] || ''}
+                                                                    onChange={e => handleCsvCellEdit(rowIdx, field, e.target.value)}
+                                                                    className="w-full px-1 py-0.5 border rounded"
+                                                                />
+                                                            </td>
+                                                        ))}
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                                <div className="flex justify-end gap-2">
+                                    <button
+                                        className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+                                        onClick={closeCsvModal}
+                                        disabled={isLoading}
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        className="px-4 py-2 bg-green-700 text-white rounded hover:bg-green-800"
+                                        onClick={() => setCsvWizardStep(2)}
+                                        disabled={isLoading || !csvEditData.length}
+                                    >
+                                        Next
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                        {csvWizardStep === 2 && (
+                            <>
+                                <div className="mb-4">
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Select Office</label>
+                                    <select
+                                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        value={selectedOfficeId}
+                                        onChange={e => setSelectedOfficeId(e.target.value)}
+                                    >
+                                        <option value="">Select</option>
+                                        {offices.map((office) => (
+                                            <option key={office.id} value={office.id}>
+                                                {`${office.branchName} (ID: ${office.branchCode})`}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                {csvError && <div className="text-red-500 mb-2">{csvError}</div>}
+                                <div className="flex justify-between gap-2">
+                                    <button
+                                        className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+                                        onClick={() => setCsvWizardStep(1)}
+                                        disabled={isLoading}
+                                    >
+                                        Back
+                                    </button>
+                                    <button
+                                        className="px-4 py-2 bg-green-700 text-white rounded hover:bg-green-800"
+                                        onClick={handleCsvOfficeSubmit}
+                                        disabled={isLoading || !selectedOfficeId}
+                                    >
+                                        {isLoading ? 'Uploading...' : 'Submit'}
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </div>
+            )}
 
 
             <aside className="flex justify-between items-center p-4 bg-white rounded-md">

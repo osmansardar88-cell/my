@@ -49,32 +49,24 @@ export const handleFileBulkUpload = (e, setGuardBulkUploadFile) => {
  * @param {string} officeId - The office ID for the upload (optional)
  * @returns {Promise} - API response
  */
-export const handleSubmitBulkUpload = async (guardBulkUploadFile, setGuardBulkUploadFile, officeId = null) => {
-    if (!guardBulkUploadFile) {
-        throw new Error('Please select a file');
+// New: handleSubmitBulkUpload for JSON-based bulk upload (wizard flow)
+export const handleSubmitBulkUpload = async (guards, setGuardBulkUploadFile, officeId = null, organizationId = null) => {
+    if (!guards || !Array.isArray(guards) || guards.length === 0) {
+        throw new Error('No guard data to upload');
     }
-
-    const formData = new FormData();
-    formData.append('file', guardBulkUploadFile);
-
-    if (officeId) {
-        formData.append('officeId', officeId);
+    if (!officeId) {
+        throw new Error('Office is required');
     }
-
+    // Optionally, organizationId can be passed or fetched from user context
     try {
-        const response = await userRequest.post('/file/upload/guards', formData, {
-            headers: {
-                'Content-Type': 'multipart/form-data',
-            },
-        });
-        console.log("bulk upload response", response);
-
-        // Clear the file after successful upload
-        setGuardBulkUploadFile(null);
-
+        const payload = {
+            officeId,
+            guards,
+        };
+        const response = await userRequest.post('/guards/bulk-upload', payload);
+        if (setGuardBulkUploadFile) setGuardBulkUploadFile(null);
         return response;
     } catch (error) {
-        // Re-throw the error to be handled by the component
         throw error;
     }
 };
