@@ -58,4 +58,7 @@ export class CreateOrganizationDto {
 
   @IsOptional()
   office?: CreateOfficeDto[];
+
+  @IsOptional()
+  features?: string[]; // Organization-level permissions/features
 }

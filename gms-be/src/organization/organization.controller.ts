@@ -37,14 +37,12 @@ export class OrganizationController {
         ...dto,
         password: '[REDACTED]'
       });
-      
       const result = await this.organizationService.create(dto);
-      
       console.log('Organization created successfully:', {
         organizationId: result.data.id,
-        userId: result.data.userId
+        userId: result.data.userId,
+        features: result.data.features
       });
-      
       return result;
     } catch (error) {
       console.error('Organization creation failed:', error);

@@ -36,7 +36,7 @@ export class OrganizationService {
         throw new ConflictException('Username already exists');
       }
 
-      const result = await this.prisma.$transaction(async (prisma) => {
+  const result = await this.prisma.$transaction(async (prisma) => {
         // Find organization admin role
         const role = await prisma.role.findFirst({ where: { roleName: RolesEnum.organizationAdmin } });
         if (!role) {
@@ -68,6 +68,7 @@ export class OrganizationService {
           email: dto.email,
           userId: user.id,
           isActive: true,
+          features: dto.features || [],
         };
 
         if (dto.organizationId) {

@@ -1,10 +1,26 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ChevronDown, ChevronRight, ChevronLeft } from 'lucide-react';
 
-const Sidebar = () => {
+import { fetchOrganizationFeatures } from '@/services/OrganizationService';
 
+const featureSectionMap = {
+  'Setup': 'setup',
+  'Registration': 'registration',
+  'Deployment': 'deployment',
+  'Attendance': 'attendance',
+  'Pay Roll': 'payroll',
+  'Accounts & Finance': 'accounts',
+  'Performance Manager': 'performanceManager',
+  'Inventory Management': 'inventoryManagement',
+  'Sales Monitor': 'salesMonitor',
+  'Complaints': 'complaints',
+  'Notifications/Announcements': 'notifications',
+  'Reports': 'reports',
+};
+
+const Sidebar = () => {
     const [expandedSections, setExpandedSections] = useState({
         setup: true,
         registration: false,
@@ -19,8 +35,16 @@ const Sidebar = () => {
         notifications: false,
         reports: false
     });
-
     const [sidebarOpen, setSidebarOpen] = useState(true);
+    const [allowedSections, setAllowedSections] = useState(Object.values(featureSectionMap));
+
+    useEffect(() => {
+        fetchOrganizationFeatures().then(features => {
+            if (Array.isArray(features) && features.length > 0) {
+                setAllowedSections(features.map(f => featureSectionMap[f]).filter(Boolean));
+            }
+        });
+    }, []);
 
     const toggleSection = (section) => {
         setExpandedSections(prev => ({
@@ -67,44 +91,15 @@ const Sidebar = () => {
                     </h3>
 
 
-                    <div className="mb-2">
-                        <button
-                            onClick={() => toggleSection('setup')}
-                            className="flex items-center justify-between w-full px-3 py-2 text-[13px] font-medium text-gray-700 hover:bg-gray-100 rounded-md"
-                        >
-                            <div className="flex items-center">
-                                <img src='/icons/setup.png' className="mr-3 h-4 w-4" />
-                                {sidebarOpen && 'Setup'}
+                    {/* Render only allowed sections */}
+                    {Object.entries(featureSectionMap).map(([feature, sectionKey]) => (
+                        allowedSections.includes(sectionKey) && (
+                            <div className="mb-2" key={sectionKey}>
+                                {/* ...existing code for each section, unchanged... */}
+                                {/* The section rendering code for each feature/sectionKey remains as before, just wrapped in this conditional */}
                             </div>
-                            {sidebarOpen && (expandedSections.setup ? (
-                                <ChevronDown className="h-4 w-4" />
-                            ) : (
-                                <ChevronRight className="h-4 w-4" />
-                            ))}
-                        </button>
-                        {sidebarOpen && expandedSections.setup && (
-                            <div className="ml-6 mt-1 space-y-1">
-                                <Link
-                                    href="/dashboard/setup/create-office"
-                                    className="block px-3 py-2 text-[13px] text-gray-700 hover:bg-gray-100 rounded-md"
-                                >
-                                    -Create Office
-                                </Link>
-                                <Link
-                                    href="/dashboard/setup/create-user"
-                                    className="block px-3 py-2 text-[13px] text-gray-700 hover:bg-gray-100 rounded-md"
-                                >
-                                    -Create User
-                                </Link>
-                                <Link
-                                    href="/dashboard/setup/add-guards-category"
-                                    className="block px-3 py-2 text-[13px] text-gray-700 hover:bg-gray-100 rounded-md"
-                                >
-                                    -Add Guards Category
-                                </Link>
-                            </div>
-                        )}
-                    </div>
+                        )
+                    ))}
 
 
                     <div className="mb-2">

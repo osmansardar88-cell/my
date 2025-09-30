@@ -90,32 +90,50 @@ const AddOrganizationPage = () => {
         province: '',
         city: '',
         addressLine1: '',
-        addressLine2: ''
+        addressLine2: '',
+        features: [
+          'Setup',
+          'Registration',
+          'Deployment',
+          'Attendance',
+          'Pay Roll',
+          'Accounts & Finance',
+          'Performance Manager',
+          'Inventory Management',
+          'Sales Monitor',
+          'Complaints',
+          'Notifications/Announcements',
+          'Reports',
+        ] // default: all enabled
     });
     const [errors, setErrors] = useState({});
 
     const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData(prev => {
-            const newData = {
-                ...prev,
-                [name]: value
-            };
-            
-            // Reset city when province changes
-            if (name === 'province') {
-                newData.city = '';
+        const { name, value, type, checked } = e.target;
+        if (name === 'features') {
+            setFormData(prev => {
+                let updated = [...prev.features];
+                if (checked) {
+                    if (!updated.includes(value)) updated.push(value);
+                } else {
+                    updated = updated.filter(f => f !== value);
+                }
+                return { ...prev, features: updated };
+            });
+        } else {
+            setFormData(prev => {
+                const newData = {
+                    ...prev,
+                    [name]: value
+                };
+                if (name === 'province') {
+                    newData.city = '';
+                }
+                return newData;
+            });
+            if (errors[name]) {
+                setErrors(prev => ({ ...prev, [name]: '' }));
             }
-            
-            return newData;
-        });
-
-        // Clear error when user starts typing
-        if (errors[name]) {
-            setErrors(prev => ({
-                ...prev,
-                [name]: ''
-            }));
         }
     };
 
@@ -143,7 +161,8 @@ const AddOrganizationPage = () => {
                 city: validatedData.city?.trim(),
                 addressLine1: validatedData.addressLine1?.trim(),
                 addressLine2: validatedData.addressLine2?.trim() || null,
-                organizationLogo: null
+                organizationLogo: null,
+                features: formData.features,
             };
 
             // Log data for debugging
@@ -235,12 +254,11 @@ const AddOrganizationPage = () => {
     return (
         <div className="flex h-screen bg-gray-50">
             <SuperAdminSidebar />
-            <div className="flex-1 overflow-auto p-8">
-                <div className="max-w-4xl mx-auto">
+            <div className="flex-1 overflow-auto p-8 flex flex-row gap-8">
+                <div className="max-w-4xl mx-auto flex-1">
                     <h1 className="text-2xl font-semibold text-gray-900 mb-6">Create Organization</h1>
-                    
                     <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow">
-                <div className="p-6 space-y-6">
+                        <div className="p-6 space-y-6">
                     {/* Basic Information Section */}
                     <div className="space-y-6">
                         <h2 className="text-lg font-medium text-gray-900">Basic Information</h2>
@@ -469,6 +487,38 @@ const AddOrganizationPage = () => {
                     </button>
                 </div>
             </form>
+                </div>
+                {/* Right Sidebar: Feature/Permission Checkboxes */}
+                <div className="w-[320px] bg-white rounded-lg shadow p-6 h-fit sticky top-8 self-start">
+                    <h2 className="text-lg font-semibold mb-4 text-gray-900">Organization Permissions</h2>
+                    <div className="flex flex-col gap-3">
+                        {[
+                            'Setup',
+                            'Registration',
+                            'Deployment',
+                            'Attendance',
+                            'Pay Roll',
+                            'Accounts & Finance',
+                            'Performance Manager',
+                            'Inventory Management',
+                            'Sales Monitor',
+                            'Complaints',
+                            'Notifications/Announcements',
+                            'Reports',
+                        ].map((feature) => (
+                            <label key={feature} className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-700">
+                                <input
+                                    type="checkbox"
+                                    name="features"
+                                    value={feature}
+                                    checked={formData.features.includes(feature)}
+                                    onChange={handleChange}
+                                    className="accent-blue-600 h-4 w-4 rounded border-gray-300"
+                                />
+                                {feature}
+                            </label>
+                        ))}
+                    </div>
                 </div>
             </div>
         </div>
