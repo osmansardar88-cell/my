@@ -1,50 +1,40 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { ChevronDown, ChevronRight, ChevronLeft } from 'lucide-react';
-
-import { fetchOrganizationFeatures } from '@/services/OrganizationService';
-
-const featureSectionMap = {
-  'Setup': 'setup',
-  'Registration': 'registration',
-  'Deployment': 'deployment',
-  'Attendance': 'attendance',
-  'Pay Roll': 'payroll',
-  'Accounts & Finance': 'accounts',
-  'Performance Manager': 'performanceManager',
-  'Inventory Management': 'inventoryManagement',
-  'Sales Monitor': 'salesMonitor',
-  'Complaints': 'complaints',
-  'Notifications/Announcements': 'notifications',
-  'Reports': 'reports',
-};
+import { useSelector } from 'react-redux';
+import { ALL_FEATURES } from '@/constants/sidebar-features';
 
 const Sidebar = () => {
-    const [expandedSections, setExpandedSections] = useState({
-        setup: true,
-        registration: false,
-        deployment: false,
-        attendance: false,
-        payroll: false,
-        accounts: false,
-        salesMonitor: false,
-        performanceManager: false,
-        inventoryManagement: false,
-        complaints: false,
-        notifications: false,
-        reports: false
-    });
-    const [sidebarOpen, setSidebarOpen] = useState(true);
-    const [allowedSections, setAllowedSections] = useState(Object.values(featureSectionMap));
-
-    useEffect(() => {
-        fetchOrganizationFeatures().then(features => {
-            if (Array.isArray(features) && features.length > 0) {
-                setAllowedSections(features.map(f => featureSectionMap[f]).filter(Boolean));
-            }
+    const { features = [], isSuperAdmin } = useSelector(state => state.user);
+    
+    console.log("Sidebar Redux state:", { features, isSuperAdmin });
+    
+    // Filter features based on permissions
+    const visibleFeatures = useMemo(() => {
+        console.log("Filtering features:", {
+            allFeatures: ALL_FEATURES.map(f => f.key),
+            userFeatures: features,
+            isSuperAdmin
         });
-    }, []);
+        return isSuperAdmin 
+            ? ALL_FEATURES 
+            : ALL_FEATURES.filter(f => {
+                const hasFeature = features.includes(f.key);
+                console.log(`Checking feature "${f.key}":`, hasFeature);
+                return hasFeature;
+              });
+    }, [features, isSuperAdmin]);
+
+    const [expandedSections, setExpandedSections] = useState(() => {
+        // Initialize expanded state for each feature, with first one expanded
+        return ALL_FEATURES.reduce((acc, feature, index) => ({
+            ...acc,
+            [feature.key.toLowerCase().replace(/\s+/g, '')]: index === 0
+        }), {});
+    });
+
+    const [sidebarOpen, setSidebarOpen] = useState(true);
 
     const toggleSection = (section) => {
         setExpandedSections(prev => ({
@@ -57,19 +47,52 @@ const Sidebar = () => {
         <div className={`transition-all duration-200 ${sidebarOpen ? 'w-[270px]' : 'w-[60px]'} h-screen bg-white border-r border-gray-200 overflow-y-auto`}>
             <div className="p-3">
                 {/* Sidebar Toggle Arrow */}
-                <div className="flex items-center justify-end mb-2">
-                    <button
-                        onClick={() => setSidebarOpen((prev) => !prev)}
-                        className="p-1 rounded hover:bg-gray-100 focus:outline-none"
-                        aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
-                    >
-                        {sidebarOpen ? (
-                            <ChevronLeft className="h-5 w-5 text-gray-500" />
-                        ) : (
-                            <ChevronRight className="h-5 w-5 text-gray-500" />
-                        )}
-                    </button>
-                </div>
+                <button
+                    onClick={() => setSidebarOpen(!sidebarOpen)}
+                    className="flex items-center w-full px-3 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-md mb-4"
+                >
+                    <ChevronLeft className={`h-5 w-5 transform duration-200 ${sidebarOpen ? '' : 'rotate-180'}`} />
+                    {sidebarOpen && <span className="ml-2">Collapse Sidebar</span>}
+                </button>
+
+                {/* Render only visible features */}
+                {visibleFeatures.map((feature) => {
+                    const sectionKey = feature.key.toLowerCase().replace(/\s+/g, '');
+                    const isExpanded = expandedSections[sectionKey];
+                    const Icon = feature.icon;
+
+                    return (
+                        <div key={feature.key} className="mb-2">
+                            <button
+                                onClick={() => toggleSection(sectionKey)}
+                                className="flex items-center justify-between w-full px-3 py-2 text-[13px] font-medium text-gray-700 hover:bg-gray-100 rounded-md"
+                            >
+                                <div className="flex items-center">
+                                    <Icon className="mr-3 h-4 w-4" />
+                                    {sidebarOpen && feature.label}
+                                </div>
+                                {sidebarOpen && (isExpanded ? (
+                                    <ChevronDown className="h-4 w-4" />
+                                ) : (
+                                    <ChevronRight className="h-4 w-4" />
+                                ))}
+                            </button>
+                            {sidebarOpen && isExpanded && (
+                                <div className="ml-6 mt-1 space-y-1">
+                                    {feature.items.map((item) => (
+                                        <Link
+                                            key={item.path}
+                                            href={item.path}
+                                            className="block px-3 py-2 text-[13px] text-gray-700 hover:bg-gray-100 rounded-md"
+                                        >
+                                            -{item.label}
+                                        </Link>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
 
                 {/* Dashboards Section */}
                 <div className="mb-6">
@@ -91,15 +114,44 @@ const Sidebar = () => {
                     </h3>
 
 
-                    {/* Render only allowed sections */}
-                    {Object.entries(featureSectionMap).map(([feature, sectionKey]) => (
-                        allowedSections.includes(sectionKey) && (
-                            <div className="mb-2" key={sectionKey}>
-                                {/* ...existing code for each section, unchanged... */}
-                                {/* The section rendering code for each feature/sectionKey remains as before, just wrapped in this conditional */}
+                    <div className="mb-2">
+                        <button
+                            onClick={() => toggleSection('setup')}
+                            className="flex items-center justify-between w-full px-3 py-2 text-[13px] font-medium text-gray-700 hover:bg-gray-100 rounded-md"
+                        >
+                            <div className="flex items-center">
+                                <img src='/icons/setup.png' className="mr-3 h-4 w-4" />
+                                {sidebarOpen && 'Setup'}
                             </div>
-                        )
-                    ))}
+                            {sidebarOpen && (expandedSections.setup ? (
+                                <ChevronDown className="h-4 w-4" />
+                            ) : (
+                                <ChevronRight className="h-4 w-4" />
+                            ))}
+                        </button>
+                        {sidebarOpen && expandedSections.setup && (
+                            <div className="ml-6 mt-1 space-y-1">
+                                <Link
+                                    href="/dashboard/setup/create-office"
+                                    className="block px-3 py-2 text-[13px] text-gray-700 hover:bg-gray-100 rounded-md"
+                                >
+                                    -Create Office
+                                </Link>
+                                <Link
+                                    href="/dashboard/setup/create-user"
+                                    className="block px-3 py-2 text-[13px] text-gray-700 hover:bg-gray-100 rounded-md"
+                                >
+                                    -Create User
+                                </Link>
+                                <Link
+                                    href="/dashboard/setup/add-guards-category"
+                                    className="block px-3 py-2 text-[13px] text-gray-700 hover:bg-gray-100 rounded-md"
+                                >
+                                    -Add Guards Category
+                                </Link>
+                            </div>
+                        )}
+                    </div>
 
 
                     <div className="mb-2">

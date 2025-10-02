@@ -22,6 +22,32 @@ import { GetOrganizationId } from 'src/common/decorators/get-organization-Id.dec
 import { CreateOfficeDto } from './dto/create-office-dto';
 import { CreateOrganizationBankAccountDto } from './dto/create-bank-account.dto';
 
+// Define explicit type for service response
+type CreateOrganizationResponse =
+  | {
+      data: {
+        user: {
+          id: string;
+          email: string;
+          userName: string;
+          roleName: string;
+          organizationId: string;
+          features: string[];
+          isSuperAdmin: boolean;
+        };
+        organization: {
+          id: string;
+          name: string;
+          features: string[];
+        };
+      };
+    }
+  | {
+      success: boolean;
+      data: any;
+      message: string;
+    };
+
 @ApiTags('Organizations')
 @Controller('organizations')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -31,18 +57,31 @@ export class OrganizationController {
 
   @Post('register')
   @ResponseMessage('Organization registered successfully')
-  async create(@Body() dto: CreateOrganizationDto) {
+  async create(@Body() dto: CreateOrganizationDto): Promise<CreateOrganizationResponse> {
     try {
       console.log('Creating organization with data:', {
         ...dto,
-        password: '[REDACTED]'
+        password: '[REDACTED]',
       });
+
       const result = await this.organizationService.create(dto);
-      console.log('Organization created successfully:', {
-        organizationId: result.data.id,
-        userId: result.data.userId,
-        features: result.data.features
-      });
+
+      if (
+        result &&
+        typeof result === 'object' &&
+        'data' in result &&
+        result.data &&
+        'organization' in result.data &&
+        'user' in result.data
+      ) {
+        console.log('Organization created successfully:', {
+          organizationId: (result.data as any).organization.id,
+          userId: (result.data as any).user.id,
+        });
+      } else {
+        console.log('Organization created successfully (fallback):', result);
+      }
+
       return result;
     } catch (error) {
       console.error('Organization creation failed:', error);

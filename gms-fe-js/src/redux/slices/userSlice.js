@@ -8,6 +8,8 @@ export const userSlice = createSlice({
         token: null,
         isFetching: false,
         error: false,
+        features: [],
+        isSuperAdmin: false,
     },
 
     reducers: {
@@ -16,10 +18,13 @@ export const userSlice = createSlice({
             state.error = false;
         },
         loginSuccess: (state, action) => {
+            const payload = action.payload;
             state.isFetching = false;
-            state.currentUser = action.payload.user || action.payload;
-            state.token = action.payload.token;
+            state.currentUser = payload.user || payload;
+            state.token = payload.token;
             state.error = false;
+            state.features = payload.user?.features || [];
+            state.isSuperAdmin = payload.user?.isSuperAdmin || false;
         },
 
         loginFailure: (state, action) => {
@@ -34,6 +39,8 @@ export const userSlice = createSlice({
             state.token = null;
             state.isFetching = false;
             state.error = false;
+            state.features = [];
+            state.isSuperAdmin = false;
         },
 
         // Action to update token without full login

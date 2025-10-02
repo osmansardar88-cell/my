@@ -33,7 +33,18 @@ export class AuthService {
   async login(dto: LoginDto) {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
-      include: { userRoles: { include: { role: true } }, userOffice: true },
+      include: { 
+        userRoles: { include: { role: true } }, 
+        userOffice: { 
+          include: { 
+            organization: {
+              include: {
+                features: true
+              }
+            }
+          } 
+        }
+      },
     });
 
     if (!user) throw new NotFoundException('User not found');
@@ -44,8 +55,37 @@ export class AuthService {
     const roleName = user.userRoles[0].role.roleName;
     const organizationId = user.userOffice.length > 0 ? user.userOffice[0].organizationId : null;
 
-    const token = this.jwtService.sign({ userId: user.id, email: user.email, roleName, organizationId });
+    let features: string[] = [];
+    if (roleName === 'superAdmin') {
+      const { ALL_FEATURES } = await import('../common/constants/features');
+      features = ALL_FEATURES;
+    } else if (organizationId) {
+      // Query features directly to ensure we get the correct field names
+      const orgFeatures = await this.prisma.organizationFeature.findMany({
+        where: { organizationId }
+      });
+      features = orgFeatures.map(f => f.featureName || '').filter(Boolean);
+    }
 
-    return { token: token, user: { id: user.id, email: user.email, userName: user.userName, roleName, organizationId } };
+    const token = this.jwtService.sign({ 
+      userId: user.id, 
+      email: user.email, 
+      roleName, 
+      organizationId,
+      features 
+    });
+
+    return { 
+      token: token, 
+      user: { 
+        id: user.id, 
+        email: user.email, 
+        userName: user.userName, 
+        roleName, 
+        organizationId,
+        isSuperAdmin: roleName === 'superAdmin',
+        features 
+      } 
+    };
   }
 }

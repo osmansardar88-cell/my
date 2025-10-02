@@ -20,7 +20,6 @@ import { FileService } from './file/file.service';
 import { LocationTypeModule } from './location-type/location-type.module';
 import { AttendanceModule } from './attendance/attendance.module';
 import { APP_GUARD } from '@nestjs/core';
-import { OrganizationFeatureGuard } from './common/guards/organization-feature.guard';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { BiometricService } from './biometric/biometric.service';
 import { BiometricModule } from './biometric/biometric.module';
@@ -57,10 +56,8 @@ import { AccountsModule } from './accounts/accounts.module';
   providers: [
     {
       provide: APP_GUARD,
-      useClass: ThrottlerGuard,
+      useClass: ThrottlerGuard, 
     },
-    // Global org feature guard (can be used per route)
-    OrganizationFeatureGuard,
     AppService, FileService,GuardService, BiometricService, AccountsService
   ],
 })
