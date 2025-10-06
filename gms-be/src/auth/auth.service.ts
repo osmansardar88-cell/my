@@ -64,7 +64,7 @@ export class AuthService {
       const orgFeatures = await this.prisma.organizationFeature.findMany({
         where: { organizationId }
       });
-      features = orgFeatures.map(f => f.featureName || '').filter(Boolean);
+      features = orgFeatures.map(f => f.feature || '').filter(Boolean);
     }
 
     const token = this.jwtService.sign({ 

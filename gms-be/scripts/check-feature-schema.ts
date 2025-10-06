@@ -9,7 +9,7 @@ async function checkFeatureSchema() {
       select: {
         id: true,
         organizationId: true,
-        featureName: true,
+        feature: true,
         createdAt: true,
         updatedAt: true
       }

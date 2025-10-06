@@ -97,7 +97,7 @@ export class OrganizationService {
         if (!userWithRoles) throw new NotFoundException('User not found after creation');
 
         // Map features
-        const userFeatures = organization.features.map((f) => f.featureName);
+  const userFeatures = organization.features.map((f) => f.feature);
 
         // Format response
         return {
